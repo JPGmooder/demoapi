@@ -1,0 +1,5 @@
+username: 'admin'
+password: 'root'
+host: 'localhost'
+port: 5438
+databaseName: 'postgres'
