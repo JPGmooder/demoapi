@@ -44,7 +44,6 @@ class AppService extends ApplicationChannel {
         .route('operation/[:page]')
         .link(AppTokencontroller.new)!
         .link(() {
-      log("aboba");
       return AppOperationController(managedContext);
     });
     currentRouter

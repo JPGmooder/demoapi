@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -10,6 +11,42 @@ import 'package:conduit/conduit.dart';
 class AppOperationController extends ResourceController {
   AppOperationController(this.context);
   ManagedContext context;
+
+  @Operation.get()
+  Future<Response> searchOperations(
+      @Bind.header(HttpHeaders.authorizationHeader) String header,
+      {@Bind.query('name') String? cityName,
+      @Bind.query('isHidden') int? isHidden}) async {
+    var id = AppsUtils.getIdFromHeader(header);
+
+    var currentOperations = await (Query<BankOperation>(context)
+          ..returningProperties((x) => [
+                x.date,
+                x.cathegory,
+                x.description,
+                x.name,
+                x.summ,
+                x.isVisible,
+                x.owner!.userName
+              ])
+          ..where((x) => x.owner!.id).equalTo(id)
+          ..where((x) => x.isVisible).equalTo(isHidden == null)
+          ..where((x) => x.name).contains(cityName ?? '')
+          ..sortBy((x) => x.date, QuerySortOrder.descending))
+        .fetch();
+    if (currentOperations.isEmpty) {
+      return Response.noContent();
+    }
+    var listToReturn = currentOperations.map((e) => e.asMap()).toList();
+    var currentUser = await context.fetchObjectWithID<User>(id);
+    LogsInsuranse.writeLog(
+        description: cityName == null
+            ? "Осуществление вывода всех операций"
+            : "Осуществление поиска операций по ключевому слову '$cityName'",
+        owner: currentUser!,
+        context: context);
+    return Response.ok(listToReturn);
+  }
 
   @Operation.get("page")
   Future<Response> getOperations(@Bind.path("page") int page,
@@ -37,38 +74,6 @@ class AppOperationController extends ResourceController {
     var currentUser = await context.fetchObjectWithID<User>(id);
     LogsInsuranse.writeLog(
         description: "Осуществление вывода страницы $page операций",
-        owner: currentUser!,
-        context: context);
-    return Response.ok(listToReturn);
-  }
-
-  @Operation.get()
-  Future<Response> searchOperations(
-      @Bind.header(HttpHeaders.authorizationHeader) String header,
-      {@Bind.query('name') String? cityName}) async {
-    var currentOperations = await (Query<BankOperation>(context)
-          ..returningProperties((x) => [
-                x.date,
-                x.cathegory,
-                x.description,
-                x.name,
-                x.summ,
-                x.owner!.userName
-              ])
-          ..where((x) => x.isVisible).equalTo(true)
-          ..where((x) => x.name).contains(cityName ?? '')
-          ..sortBy((x) => x.date, QuerySortOrder.descending))
-        .fetch();
-    if (currentOperations.isEmpty) {
-      return Response.noContent();
-    }
-    var id = AppsUtils.getIdFromHeader(header);
-    var listToReturn = currentOperations.map((e) => e.asMap()).toList();
-    var currentUser = await context.fetchObjectWithID<User>(id);
-    LogsInsuranse.writeLog(
-        description: cityName == null
-            ? "Осуществление вывода всех операций"
-            : "Осуществление поиска операций по ключевому слову '$cityName'",
         owner: currentUser!,
         context: context);
     return Response.ok(listToReturn);
@@ -183,13 +188,16 @@ class AppOperationController extends ResourceController {
 
         return await aboba;
       });
-       LogsInsuranse.writeLog(
-          description: logical != null ? "Логическое ${logical == 1 ? 'восстановление' : 'удаление'} операции №$id" : "Удаление операции №$id",
+      LogsInsuranse.writeLog(
+          description: logical != null
+              ? "Логическое ${logical == 1 ? 'восстановление' : 'удаление'} операции №$id"
+              : "Удаление операции №$id",
           owner: poster,
           context: context);
       return Response.noContent();
     } on QueryException catch (e) {
-      return Response.serverError(body: e.response.body);
+      log(e.toString());
+      return Response.serverError(body: e.message);
     }
   }
 }

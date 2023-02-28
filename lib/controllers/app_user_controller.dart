@@ -41,10 +41,20 @@ class AppUserController extends ResourceController {
       if (foundedUser == null) {
         return Response.serverError(body: "Пользователь не найден");
       }
+      String? hashPassword;
+      if (user.password != null && user.password!.isNotEmpty) {
+        var salt = generateRandomSalt();
+        hashPassword = generatePasswordHash(user.password!, salt);
+      }
+
       final qUpdateUser = Query<User>(context)
         ..where((x) => x.id).equalTo(id)
         ..values.userName = user.userName ?? foundedUser.userName
         ..values.email = user.email ?? foundedUser.email;
+
+      if (hashPassword != null) {
+        qUpdateUser.values.hashedPassword = hashPassword;
+      }
       await qUpdateUser.updateOne();
 
       final findUser = await context.fetchObjectWithID<User>(id);

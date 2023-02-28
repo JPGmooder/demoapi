@@ -48,3 +48,4 @@ class _BankOperation {
   @Relate(#operations, onDelete: DeleteRule.cascade, isRequired: true)
   User? owner;
 }
+
